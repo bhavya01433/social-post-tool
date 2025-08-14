@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import PlatformSelector, { PLATFORMS } from "./components/PlatformSelector";
+import PlatformSelector from "./components/PlatformSelector";
 import PostPreview from "./components/PostPreview";
 
 export default function HomePage() {
@@ -9,9 +9,7 @@ export default function HomePage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showPromptError, setShowPromptError] = useState(false);
-  const [generated, setGenerated] = useState<{ [p: string]: string } | null>(
-    null
-  );
+  const [generated, setGenerated] = useState<{ [p: string]: string | { content: string } } | null>(null);
   const [images, setImages] = useState<{
     [p: string]: { image?: string; error?: string };
   } | null>(null);
@@ -51,11 +49,22 @@ export default function HomePage() {
         selected.forEach((platform) => (initialImages[platform] = {}));
         setImages(initialImages);
 
-        // Generate images
+        // Prepare image prompts per platform from generated content
+        // Since current generatePost route doesn't return imagePrompt, use the main prompt for all platforms
+        const imagePrompts: { [p: string]: string } = {};
+        selected.forEach((platform) => {
+          // Use the main prompt for image generation since imagePrompt is not available
+          imagePrompts[platform] = prompt.trim();
+        });
+
+        // Generate images using prompts - updated to match current generateImage route
         const imgRes = await fetch("/api/generateImage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, platforms: selected }),
+          body: JSON.stringify({ 
+            prompt: prompt.trim(), // Current route expects 'prompt' not 'imagePrompts'
+            platforms: selected 
+          }),
         });
         const imgData = await imgRes.json();
         if (imgRes.ok && imgData.images) {
@@ -74,7 +83,7 @@ export default function HomePage() {
       } else {
         setGenerated({ error: data.error || "Failed to generate post." });
       }
-    } catch (err) {
+    } catch {
       setGenerated({ error: "Server error. Please try again." });
       const errorImages: { [p: string]: { error: string } } = {};
       selected.forEach(
